@@ -163,3 +163,4 @@ cython_debug/
 /cellosaurus.txt
 /small.sh
 /.idea
+/reannotate_sdrf.ipynb
