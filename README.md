@@ -1,6 +1,6 @@
 # Cell Line Metadata Database
 
-This repository contains scripts for creating and managing cell line metadata for the multiomics config datasets and [quantms.org](https://quantms.org), leveraging ontologies and natural language processing (NLP) to annotate cell lines in SDRF files. 
+This repository contains scripts for creating and managing [cell line metadata database](cl-annotations-db.tsv) to enable the annotation of SDRFs for cell lines datasets. The main driver use case is the annotation of SDRF datasets for the [quantms.org resource](quantms.org). This repo uses multiple ontologies and natural language processing (NLP) to annotate cell lines in SDRF files. 
 
 ## Motivation
 
@@ -31,7 +31,7 @@ The database is created in the following path [cl-annotations-db.tsv](cl-annotat
 - **ancestry category**: The ancestry category of the cell line as annotated in Cellosaurus. If not available we use other sources. 
 - **disease**: The disease is _"agreed"_ among sources.  
 - **cell type**: The cell type is _"agreed"_ among sources.
-- **Material**: The material is _"agreed"_ among sources.
+- **Material type**: The material is _"agreed"_ among sources.
 - **synonyms**: This field is built using all the accessions and synonyms from all sources.
 - **curated**: This field is used to annotate if the cell line has been curated by the team, the classes are _not curated_, _ai curated_, _manual curated_.
 
