@@ -164,3 +164,8 @@ cython_debug/
 /sdrf-cls/small.sh
 /.idea
 /sdrf-cls/reannotate_sdrf.ipynb
+
+*/*/*.mzML
+*/*/*.raw
+/opt-params/Homo-sapiens-uniprot-reviewed-contaminants-entrap-decoy-20240615.fasta
+*/*/*.tsv
