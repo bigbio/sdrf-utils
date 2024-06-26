@@ -1,0 +1,15 @@
+# You can use this file to create a conda environment for this pipeline:
+#   conda env create -f environment.yml
+name: opt-params-1.0
+channels:
+  - openms
+  - conda-forge
+  - bioconda
+dependencies:
+  - bioconda::thermorawfileparser=1.4.2
+  - bioconda::crux-toolkit
+  - bioconda::sage-proteomics
+  - pandas
+  - matplotlib
+
+
