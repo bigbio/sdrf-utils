@@ -171,3 +171,4 @@ cython_debug/
 */*/*.tsv
 */*/*.pin
 */*/results.json
+*/*/*/*.png
