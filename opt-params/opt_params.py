@@ -196,7 +196,7 @@ def combined_search(results: list = [], start_fragment_tolerance: int = 0, start
                     mzml_files: list = [],
                     grid_frag_steps: int=10,
                     grid_prec_steps: int=5, max_iterations=10, search_radius=1, fasta_file="", initial_temp=100,
-                    cooling_rate=0.95) -> Tuple[int, int, List[Dict]]:
+                    cooling_rate=0.95, sage_config_file=None) -> Tuple[int, int, List[Dict]]:
     def acceptance_probability(old_value, new_value, temperature):
         if new_value > old_value:
             return 1.0
@@ -213,7 +213,7 @@ def combined_search(results: list = [], start_fragment_tolerance: int = 0, start
     for ft in fragment_tolerances:
         for pt in precursor_tolerances:
             sage_table = run_sage(fragment_tolerance=ft, precursor_tolerance=pt,
-                                  fragment_type=fragment_type, mzml_files=mzml_files, fasta_path=fasta_file, use_file_values=False)
+                                  fragment_type=fragment_type, mzml_files=mzml_files, fasta_path=fasta_file, sage_config_file=sage_config_file, use_file_values=False)
             new_value = compute_best_combination(sage_table)
             results.append(get_stats_from_sage(sage_table, ft, pt, new_value))
 
@@ -303,7 +303,8 @@ def tolerances(fragment_type:str, mzml_path: str, initial_fragment_tolerance: in
                                                                                num_psms=num_psms,
                                                                                fragment_type=fragment_type,
                                                                                mzml_files=mzml_files,
-                                                                               max_iterations=max_iterations, fasta_file=fasta_file)
+                                                                               max_iterations=max_iterations, fasta_file=fasta_file,
+                                                                                 sage_config_file=sage_config_file)
 
     print("Best tolerances found: Fragment tolerance: {} - Precursor tolerance: {}".format(best_fragment_tolerance,
                                                                                            best_precursor_tolerance))
