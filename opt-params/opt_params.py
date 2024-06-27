@@ -253,10 +253,11 @@ def combined_search(results: list = [], start_fragment_tolerance: int = 0, start
 @click.option("--min-precursor-tolerance", default=10, help="The minimum precursor tolerance to consider.", type=int)
 @click.option("--max-precursor-tolerance", default=50, help="The maximum precursor tolerance to consider.", type=int)
 @click.option("--fasta-file", default="Homo-sapiens-uniprot-reviewed-contaminants-entrap-decoy-20240615.fasta", help="The path to the fasta file to use for the SAGE analysis.")
+@click.option("--sage-config-file", default="sage-general.json", help="The path to the Sage config file to use for the SAGE analysis.")
 @click.option("--max-iterations", default=10, help="The maximum number of iterations to run the optimization.", type=int)
 def tolerances(fragment_type:str, mzml_path: str, initial_fragment_tolerance: int, initial_precursor_tolerance: int,
          min_fragment_tolerance: int, max_fragment_tolerance: int, min_precursor_tolerance: int, max_precursor_tolerance: int,
-         fasta_file, max_iterations: int):
+         fasta_file, sage_config_file, max_iterations: int):
     results = []
 
     # detect absolute all the mzML files in the mzml-path
@@ -271,9 +272,13 @@ def tolerances(fragment_type:str, mzml_path: str, initial_fragment_tolerance: in
     best_precursor_tolerance = 0
     best_fragment_tolerance = 0
 
+    if sage_config_file is None:
+        sage_config_file = "general-sage.json"
+
+
     if initial_fragment_tolerance is not None and initial_precursor_tolerance is not None:
         sage_table = run_sage(int(initial_fragment_tolerance), int(initial_precursor_tolerance), fragment_type,
-                              mzml_files, fasta_path = fasta_file, use_file_values=False)
+                              mzml_files, fasta_path = fasta_file, sage_config_file=sage_config_file, use_file_values=False)
         num_psms = compute_best_combination(sage_table)
         results.append(
             get_stats_from_sage(sage_table, initial_fragment_tolerance, initial_precursor_tolerance, num_psms))
