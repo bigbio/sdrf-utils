@@ -22,16 +22,12 @@
             "C": 57.0215
         },
         "variable_mods": {
-            "M": [
-                15.994
-            ],
-            "N": [
-                0.984
-            ]
+            "M": [15.994],
+            "N": [0.984]
         },
         "generate_decoys": false,
         "decoy_tag": "DECOY_",
-        "fasta": "../Homo-sapiens-uniprot-reviewed-contaminants-entrap-decoy-20240615.fasta"
+        "fasta": "Homo-sapiens-uniprot-reviewed-contaminants-entrap-decoy-20240615.fasta"
     },
     "precursor_tol": {
         "ppm": [

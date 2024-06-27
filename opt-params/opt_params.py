@@ -19,16 +19,27 @@ logging.basicConfig(level=logging.INFO)
 folder_plots_uui = ""
 folder_sperator = os.path.sep
 
-def run_sage(fragment_tolerance: int, precursor_tolerance: int, fragment_type: str = "ppm",
-             mzml_files: list = [], fasta_path: str = "" ) -> DataFrame:
-    with open("general-sage.json") as f:
+CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
+
+def run_sage(fragment_tolerance: int = 0, precursor_tolerance: int = 0, fragment_type: str = "ppm",
+             mzml_files: list = [], fasta_path: str = "", sage_config_file: str = None ) -> DataFrame:
+
+    if sage_config_file is None:
+        sage_config_file = "general-sage-ptms.json"
+
+    with open(sage_config_file) as f:
         data = json.load(f)
 
-    data["precursor_tol"]["ppm"] = [int(-1 * (precursor_tolerance)), int(precursor_tolerance)]
-    if fragment_type == "ppm":
-        data["fragment_tol"][fragment_type] = [int(-1 * (fragment_tolerance)), int(fragment_tolerance)]
+    if fragment_tolerance != 0 and precursor_tolerance != 0:
+        data["precursor_tol"]["ppm"] = [int(-1 * (precursor_tolerance)), int(precursor_tolerance)]
+        if fragment_type == "ppm":
+            data["fragment_tol"][fragment_type] = [int(-1 * (fragment_tolerance)), int(fragment_tolerance)]
+        else:
+            data["fragment_tol"][fragment_type] = [-1 * (fragment_tolerance), fragment_tolerance]
     else:
-        data["fragment_tol"][fragment_type] = [-1 * (fragment_tolerance), fragment_tolerance]
+        fragment_tolerance = data["fragment_tol"]["ppm"][1]
+        precursor_tolerance = data["precursor_tol"]["ppm"][1]
+
     data["mzml_paths"] = mzml_files
 
     if os.path.exists(fasta_path):
@@ -42,7 +53,7 @@ def run_sage(fragment_tolerance: int, precursor_tolerance: int, fragment_type: s
 
     print("Running SAGE with fragment tolerance: {} and precursor tolerance: {}".format(fragment_tolerance,precursor_tolerance))
 
-    subprocess.run(["sage", "general-sage.json", "--write-pin"])
+    result = subprocess.run(["sage", "general-sage.json", "--write-pin"], capture_output=True, text=True)
     sage_table = pd.read_csv("results.sage.tsv", sep="\t")
     sage_table = compute_entrapment_qvalues(sage_table)
     return sage_table
@@ -65,8 +76,8 @@ def extract_ptms(sage_table_target):
     return modification_counts_dict
 
 
-def get_stats_from_sage(sage_table: pd.DataFrame, fragment_tolerance: int, precursor_tolerance: int,
-                        number_psms: int) -> dict:
+def get_stats_from_sage(sage_table: pd.DataFrame, fragment_tolerance: int = 0, precursor_tolerance: int = 0,
+                        number_psms: int = 0) -> dict:
     sage_table = sage_table[sage_table['spectrum_q'] <= 0.01]
     sage_table = sage_table[sage_table['entrapment_qvalue'] <= 0.01]
     decoy_filter = sage_table['proteins'].str.contains("DECOY_")
@@ -93,7 +104,8 @@ def get_stats_from_sage(sage_table: pd.DataFrame, fragment_tolerance: int, precu
     }
 
     for ky, val in ptms_dist.items():
-        stats[f"ptm[{ky}]"] = val
+        stats[f"{ky}"] = val
+        stats[f"{ky}_percentage"] = (val / len(sage_table_target['peptide'])) * 100
 
     return stats
 
@@ -234,7 +246,7 @@ def combined_search(results: list = [], start_fragment_tolerance: int = 0, start
 @click.option("--max-precursor-tolerance", default=50, help="The maximum precursor tolerance to consider.", type=int)
 @click.option("--fasta-file", default="Homo-sapiens-uniprot-reviewed-contaminants-entrap-decoy-20240615.fasta", help="The path to the fasta file to use for the SAGE analysis.")
 @click.option("--max-iterations", default=10, help="The maximum number of iterations to run the optimization.", type=int)
-def main(fragment_type:str, mzml_path: str, initial_fragment_tolerance: int, initial_precursor_tolerance: int,
+def tolerances(fragment_type:str, mzml_path: str, initial_fragment_tolerance: int, initial_precursor_tolerance: int,
          min_fragment_tolerance: int, max_fragment_tolerance: int, min_precursor_tolerance: int, max_precursor_tolerance: int,
          fasta_file, max_iterations: int):
     results = []
@@ -305,5 +317,69 @@ def main(fragment_type:str, mzml_path: str, initial_fragment_tolerance: int, ini
     results_df.to_csv("sage_results_tolerances.tsv", sep="\t", index=False)
 
 
+@click.command("ptms", help="Extract PTMs from SAGE results.")
+@click.option("--mzml-path", default=".", help="The path to the mzML files to use for the SAGE analysis.")
+@click.option("--fasta-file", default="Homo-sapiens-uniprot-reviewed-contaminants-entrap-decoy-20240615.fasta", help="The path to the fasta file to use for the SAGE analysis.")
+@click.option("--sage-config-file", default="general-sage-ptms.json", help="The path to the Sage config file to use for the SAGE analysis.", required = True)
+@click.option("--open-search", help="Open search analysis", is_flag=True)
+def ptms(mzml_path: str, fasta_file: str, sage_config_file: str, open_search: bool):
+    # detect absolute all the mzML files in the mzml-path
+
+    if not os.path.exists(mzml_path):
+        logging.error(f"Folder {mzml_path} does not exist.")
+        raise FileNotFoundError(f"Folder {mzml_path} does not exist.")
+
+    if not os.path.exists(fasta_file):
+        logging.error(f"File {fasta_file} does not exist.")
+        raise FileNotFoundError(f"File {fasta_file} does not exist.")
+
+    if not os.path.exists(sage_config_file):
+        logging.error(f"File {sage_config_file} does not exist.")
+        raise FileNotFoundError(f"File {sage_config_file} does not exist.")
+    else:
+        sage_params = json.load(open(sage_config_file))
+        if "ppm" in sage_params["precursor_tol"]:
+            precursor_tolerance = sage_params["precursor_tol"]["ppm"][1]
+        else:
+            precursor_tolerance = sage_params["precursor_tol"]["da"][1]
+
+        if "ppm" in sage_params["fragment_tol"]:
+            fragment_tolerance = sage_params["fragment_tol"]["ppm"][1]
+        else:
+            fragment_tolerance = sage_params["fragment_tol"]["da"][1]
+
+
+    mzml_files = [os.path.join(mzml_path, f) for f in os.listdir(mzml_path) if f.endswith(".mzML")]
+
+    global folder_plots_uui
+    folder_plots_uui = str(uuid.uuid4())
+    os.makedirs(folder_plots_uui)
+
+    sage_table = run_sage(fragment_type="ppm", mzml_files=mzml_files, fasta_path=fasta_file, sage_config_file=sage_config_file)
+    num_psms = compute_best_combination(sage_table)
+    stats = get_stats_from_sage(sage_table, fragment_tolerance=fragment_tolerance, precursor_tolerance=precursor_tolerance, number_psms=num_psms)
+
+    # check verbose the PTMs that percentace bigger than 1% of the psms
+    logging.info("PTMs with percentage bigger than 1% of the psms:")
+    for key, value in stats.items():
+        if "_percentage" in key and value > 1:
+            logging.info(f"{key} - {value}")
+
+    # print dictionary stats to a file as key value.
+    with open("sage_stats_ptms.tsv", "w") as f:
+        for key, value in stats.items():
+            f.write(f"{key}\t{value}\n")
+
+
+@click.group(context_settings=CONTEXT_SETTINGS)
+def cli():
+    """
+    Main function to run the CLI
+    """
+    pass
+
+cli.add_command(tolerances)
+cli.add_command(ptms)
+
 if __name__ == "__main__":
-    main()
+    cli()

@@ -22,22 +22,26 @@
             "C": 57.0215
         },
         "variable_mods": {
-            "M": 15.994,
-            "[": 42.0105
+            "M": [15.994],
+            "[": [42.0105, 27.9949, 43.0058],
+            "N": [0.984],
+            "Q": [0.984, -17.02654],
+            "K": [27.9949, 43.0058]
         },
+        "generate_decoys": false,
         "decoy_tag": "DECOY_",
         "fasta": "Homo-sapiens-uniprot-reviewed-contaminants-entrap-decoy-20240615.fasta"
     },
     "precursor_tol": {
         "ppm": [
-            -99,
-            99
+            -10,
+            10
         ]
     },
     "fragment_tol": {
         "ppm": [
-            -11,
-            11
+            -10,
+            10
         ]
     },
     "isotope_errors": [
@@ -55,7 +59,7 @@
     },
     "deisotope": true,
     "min_peaks": 15,
-    "max_peaks": 150,
+    "max_peaks": 300,
     "max_fragment_charge": 1,
     "min_matched_peaks": 4,
     "mzml_paths": [

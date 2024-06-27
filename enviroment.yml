@@ -11,5 +11,10 @@ dependencies:
   - bioconda::sage-proteomics
   - pandas
   - matplotlib
+  - scikit-learn
+  - click
+  - seaborn
+  - numpy
+  - pyarrow
 
 

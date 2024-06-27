@@ -169,3 +169,5 @@ cython_debug/
 */*/*.raw
 /opt-params/Homo-sapiens-uniprot-reviewed-contaminants-entrap-decoy-20240615.fasta
 */*/*.tsv
+*/*/*.pin
+*/*/results.json
