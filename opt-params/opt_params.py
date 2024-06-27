@@ -25,7 +25,7 @@ def run_sage(fragment_tolerance: int = 0, precursor_tolerance: int = 0, fragment
              mzml_files: list = [], fasta_path: str = "", sage_config_file: str = None, use_file_values: bool = True ) -> DataFrame:
 
     if sage_config_file is None:
-        sage_config_file = "general-sage-ptms.json"
+        raise ValueError("The sage config file is required.")
 
     with open(sage_config_file) as f:
         data = json.load(f)
@@ -56,12 +56,20 @@ def run_sage(fragment_tolerance: int = 0, precursor_tolerance: int = 0, fragment
         logging.error(f"File {fasta_path} does not exist.")
         raise FileNotFoundError(f"File {fasta_path} does not exist.")
 
-    with open("general-sage.json", "w") as f:
+    temp_sage_file = str(uuid.uuid4()) + ".json"
+    with open(temp_sage_file, "w") as f:
         json.dump(data, f, indent=4)
 
     logging.info("Running SAGE with fragment tolerance: {} and precursor tolerance: {}".format(fragment_tolerance,precursor_tolerance))
 
-    result = subprocess.run(["sage", "general-sage.json", "--write-pin"], capture_output=True, text=True)
+    result = subprocess.run(["sage", temp_sage_file, "--write-pin"], capture_output=True, text=True)
+    os.remove(temp_sage_file)
+
+    if result.returncode != 0:
+        logging.error("Error running SAGE.")
+        logging.error(result.stderr)
+        raise ValueError("Error running SAGE.")
+
     sage_table = pd.read_csv("results.sage.tsv", sep="\t")
     sage_table = compute_entrapment_qvalues(sage_table)
     return sage_table
