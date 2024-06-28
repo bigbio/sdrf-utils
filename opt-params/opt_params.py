@@ -1,4 +1,5 @@
 import logging
+import math
 import random
 import re
 import uuid
@@ -207,22 +208,55 @@ def combined_search(results: list = [], start_fragment_tolerance: int = 0, start
     best_value = int(num_psms)
 
     # Coarse Grid Search
-    fragment_tolerances = np.linspace(min_fragment_tolerance, max_fragment_tolerance, grid_frag_steps).astype(int)
     precursor_tolerances = np.linspace(min_precursor_tolerance, max_precursor_tolerance, grid_prec_steps).astype(int)
+
+    grid_best_value = 1
+    for ft in precursor_tolerances:
+        sage_table = run_sage(fragment_tolerance=start_fragment_tolerance, precursor_tolerance=ft,
+                              fragment_type=fragment_type, mzml_files=mzml_files, fasta_path=fasta_file,
+                              sage_config_file=sage_config_file, use_file_values=False)
+        new_value = compute_best_combination(sage_table)
+        results.append(get_stats_from_sage(sage_table, start_fragment_tolerance, ft, new_value))
+
+        if (new_value - grid_best_value) / grid_best_value > 0.01: # 1% improvement
+            best_fragment_tolerance = start_fragment_tolerance
+            best_precursor_tolerance = ft
+            grid_best_value = new_value
+            logging.info("New Best value for precursor tolerance {}: {}".format(best_precursor_tolerance, grid_best_value))
+        else:
+            logging.info("Current value for precursor tolerance worst than previous {}: {}".format(ft, grid_best_value))
+            break
+
+    if best_precursor_tolerance == max_precursor_tolerance:
+        logging.info("Best precursor tolerance is the maximum value {}. You have to consider locking for for unknown modifications.".format(best_precursor_tolerance))
+
+    fragment_tolerances = np.linspace(start_fragment_tolerance, max_fragment_tolerance, grid_frag_steps).astype(int)
 
     for ft in fragment_tolerances:
         for pt in precursor_tolerances:
             sage_table = run_sage(fragment_tolerance=ft, precursor_tolerance=pt,
-                                  fragment_type=fragment_type, mzml_files=mzml_files, fasta_path=fasta_file, sage_config_file=sage_config_file, use_file_values=False)
+                                  fragment_type=fragment_type, mzml_files=mzml_files, fasta_path=fasta_file,
+                                  sage_config_file=sage_config_file, use_file_values=False)
             new_value = compute_best_combination(sage_table)
             results.append(get_stats_from_sage(sage_table, ft, pt, new_value))
 
-            if new_value > best_value:
+            if (new_value - grid_best_value) / grid_best_value > 0.01: # 1% improvement
                 best_fragment_tolerance = ft
                 best_precursor_tolerance = pt
                 best_value = new_value
+                logging.info("New Best value for fragment tolerance {}: {}".format(best_fragment_tolerance, best_value))
+            else:
+                logging.info("Current value for fragment tolerance worst than previous {}: {}".format(ft, grid_best_value))
+                break
 
     # Simulated Annealing
+    if grid_best_value < best_value:
+        best_value = int(num_psms)
+        logging.info("Best value from grid search is better than the initial value. Using it.")
+        best_fragment_tolerance = start_fragment_tolerance
+        best_precursor_tolerance = start_precursor_tolerance
+
+
     temperature = initial_temp
     current_fragment_tolerance = best_fragment_tolerance
     current_precursor_tolerance = best_precursor_tolerance
@@ -255,8 +289,8 @@ def combined_search(results: list = [], start_fragment_tolerance: int = 0, start
 @click.command("tolerances", help="Optimize the fragment and precursor tolerances using the SAGE algorithm.")
 @click.option("--fragment-type", default="ppm", help="The type of fragment tolerance to use (ppm or da)")
 @click.option("--mzml-path", default=".", help="The path to the mzML files to use for the SAGE analysis.")
-@click.option("--initial-fragment-tolerance", help="The initial fragment tolerance to use for the optimization.", type=int)
-@click.option("--initial-precursor-tolerance", help="The initial precursor tolerance to use for the optimization.", type=int)
+@click.option("--initial-fragment-tolerance", help="The initial fragment tolerance to use for the optimization.", type=int, default=20)
+@click.option("--initial-precursor-tolerance", help="The initial precursor tolerance to use for the optimization.", type=int, default=20)
 @click.option("--min-fragment-tolerance", default=1, help="The minimum fragment tolerance to consider.", type=int)
 @click.option("--max-fragment-tolerance", default=50, help="The minimum precursor tolerance to consider.", type=int)
 @click.option("--min-precursor-tolerance", default=10, help="The minimum precursor tolerance to consider.", type=int)
@@ -289,15 +323,18 @@ def tolerances(fragment_type:str, mzml_path: str, initial_fragment_tolerance: in
         sage_table = run_sage(int(initial_fragment_tolerance), int(initial_precursor_tolerance), fragment_type,
                               mzml_files, fasta_path = fasta_file, sage_config_file=sage_config_file, use_file_values=False)
         num_psms = compute_best_combination(sage_table)
-        results.append(
-            get_stats_from_sage(sage_table, initial_fragment_tolerance, initial_precursor_tolerance, num_psms))
+        stats = get_stats_from_sage(sage_table, initial_fragment_tolerance, initial_precursor_tolerance, num_psms)
+        results.append(stats)
+        initial_fragment_tolerance = math.ceil(stats["fragment_std_error_plus4"])
         best_precursor_tolerance = initial_precursor_tolerance
         best_fragment_tolerance = initial_fragment_tolerance
+
+
 
     best_fragment_tolerance, best_precursor_tolerance, results = combined_search(results=results,
                                                                                start_fragment_tolerance=best_fragment_tolerance,
                                                                                start_precursor_tolerance=best_precursor_tolerance,
-                                                                               min_fragment_tolerance=min_fragment_tolerance,
+                                                                               min_fragment_tolerance=initial_fragment_tolerance,
                                                                                max_fragment_tolerance=max_fragment_tolerance,
                                                                                min_precursor_tolerance=min_precursor_tolerance,
                                                                                max_precursor_tolerance=max_precursor_tolerance,
