@@ -235,7 +235,8 @@ def combined_search(results: list = [], start_fragment_tolerance: int = 0, start
             min(max_precursor_tolerance, current_precursor_tolerance + search_radius))
 
         sage_table = run_sage(fragment_tolerance=fragment_tolerance, precursor_tolerance=precursor_tolerance,
-                              fragment_type=fragment_type, mzml_files=mzml_files, fasta_path=fasta_file, use_file_values=False)
+                              fragment_type=fragment_type, mzml_files=mzml_files, fasta_path=fasta_file, sage_config_file=sage_config_file,
+                              use_file_values=False)
         new_value = compute_best_combination(sage_table)
         results.append(get_stats_from_sage(sage_table, fragment_tolerance, precursor_tolerance, new_value))
 
