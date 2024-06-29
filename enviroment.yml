@@ -16,5 +16,6 @@ dependencies:
   - seaborn
   - numpy
   - pyarrow
+  - pyopenms
 
 

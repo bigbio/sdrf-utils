@@ -22,9 +22,10 @@ folder_sperator = os.path.sep
 
 CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
 
-def run_sage(fragment_tolerance: int = 0, precursor_tolerance: int = 0, fragment_type: str = "ppm",
-             mzml_files: list = [], fasta_path: str = "", sage_config_file: str = None, use_file_values: bool = True ) -> DataFrame:
 
+def run_sage(fragment_tolerance: int = 0, precursor_tolerance: int = 0, fragment_type: str = "ppm",
+             mzml_files: list = [], fasta_path: str = "", sage_config_file: str = None,
+             use_file_values: bool = True) -> DataFrame:
     if sage_config_file is None:
         raise ValueError("The sage config file is required.")
 
@@ -32,11 +33,11 @@ def run_sage(fragment_tolerance: int = 0, precursor_tolerance: int = 0, fragment
         data = json.load(f)
 
     if fragment_tolerance != 0 and precursor_tolerance != 0 or not use_file_values:
-        data["precursor_tol"]["ppm"] = [int(-1 * (precursor_tolerance)), int(precursor_tolerance)]
+        data["precursor_tol"]["ppm"] = [int(-1 * precursor_tolerance), int(precursor_tolerance)]
         if fragment_type == "ppm":
-            data["fragment_tol"][fragment_type] = [int(-1 * (fragment_tolerance)), int(fragment_tolerance)]
+            data["fragment_tol"][fragment_type] = [int(-1 * fragment_tolerance), int(fragment_tolerance)]
         else:
-            data["fragment_tol"][fragment_type] = [-1 * (fragment_tolerance), fragment_tolerance]
+            data["fragment_tol"][fragment_type] = [-1 * fragment_tolerance, fragment_tolerance]
     else:
         logging.info("Using the values from the file.")
         if "ppm" in data["precursor_tol"]:
@@ -61,7 +62,8 @@ def run_sage(fragment_tolerance: int = 0, precursor_tolerance: int = 0, fragment
     with open(temp_sage_file, "w") as f:
         json.dump(data, f, indent=4)
 
-    logging.info("Running SAGE with fragment tolerance: {} and precursor tolerance: {}".format(fragment_tolerance,precursor_tolerance))
+    logging.info("Running SAGE with fragment tolerance: {} and precursor tolerance: {}".format(fragment_tolerance,
+                                                                                               precursor_tolerance))
 
     result = subprocess.run(["sage", temp_sage_file, "--write-pin"], capture_output=True, text=True)
     os.remove(temp_sage_file)
@@ -77,7 +79,6 @@ def run_sage(fragment_tolerance: int = 0, precursor_tolerance: int = 0, fragment
 
 
 def extract_ptms(sage_table_target):
-
     def extract_modifications(peptide):
         return re.findall(r'([A-Z]\[\+[0-9.]+\])', peptide)
 
@@ -137,7 +138,8 @@ def plot_distribution(sage_table_target, sage_table_decoy, entrap_peptides, frag
     plt.legend(loc='upper right')
     plt.xlabel(
         "Q value - fragment tolerance: {} - precursor tolerance: {}".format(fragment_tolerance, precursor_tolerance))
-    file_name = folder_plots_uui + folder_sperator + "q_value_distribution-{}-{}.png".format(fragment_tolerance, precursor_tolerance)
+    file_name = folder_plots_uui + folder_sperator + "q_value_distribution-{}-{}.png".format(fragment_tolerance,
+                                                                                             precursor_tolerance)
     plt.savefig(file_name)
     logging.info("Showing Q value distribution plot.")
     plt.close()
@@ -177,16 +179,15 @@ def compute_best_combination(sage_table: pd.DataFrame) -> int:
     """
     Compute the difference between the decoys and entrapmet qvalues.
     Sum all the differences and return the value.
-    :param sage_data_frame:
-    :return:
+    :param sage_table: pandas data frame with the sage results
     """
     # sage_data_frame['q_diff'] = (sage_data_frame['spectrum_q'] - sage_data_frame['spectrum_entrapment_q']).abs()
     # make copy of the data frame
     current_data_frame = sage_table.copy()
     current_data_frame = current_data_frame[current_data_frame['spectrum_q'] <= 0.01]
     current_data_frame = current_data_frame[current_data_frame['entrapment_qvalue'] <= 0.01]
-    filter = current_data_frame['proteins'].str.contains("DECOY_")
-    sage_table_target = current_data_frame[~filter]
+    filter_decoy = current_data_frame['proteins'].str.contains("DECOY_")
+    sage_table_target = current_data_frame[~filter_decoy]
     return len(sage_table_target['peptide'])
 
 
@@ -195,8 +196,8 @@ def combined_search(results: list = [], start_fragment_tolerance: int = 0, start
                     min_precursor_tolerance: int = 10,
                     max_precursor_tolerance: int = 100, num_psms: int = 0, fragment_type: str = "ppm",
                     mzml_files: list = [],
-                    grid_frag_steps: int=10,
-                    grid_prec_steps: int=5, max_iterations=10, search_radius=1, fasta_file="", initial_temp=100,
+                    grid_frag_steps: int = 10,
+                    grid_prec_steps: int = 5, max_iterations=10, search_radius=1, fasta_file="", initial_temp=100,
                     cooling_rate=0.95, sage_config_file=None) -> Tuple[int, int, List[Dict]]:
     def acceptance_probability(old_value, new_value, temperature):
         if new_value > old_value:
@@ -218,17 +219,20 @@ def combined_search(results: list = [], start_fragment_tolerance: int = 0, start
         new_value = compute_best_combination(sage_table)
         results.append(get_stats_from_sage(sage_table, start_fragment_tolerance, ft, new_value))
 
-        if (new_value - grid_best_value) / grid_best_value > 0.01: # 1% improvement
+        if (new_value - grid_best_value) / grid_best_value > 0.01:  # 1% improvement
             best_fragment_tolerance = start_fragment_tolerance
             best_precursor_tolerance = ft
             grid_best_value = new_value
-            logging.info("New Best value for precursor tolerance {}: {}".format(best_precursor_tolerance, grid_best_value))
+            logging.info(
+                "New Best value for precursor tolerance {}: {}".format(best_precursor_tolerance, grid_best_value))
         else:
             logging.info("Current value for precursor tolerance worst than previous {}: {}".format(ft, grid_best_value))
             break
 
     if best_precursor_tolerance == max_precursor_tolerance:
-        logging.info("Best precursor tolerance is the maximum value {}. You have to consider locking for for unknown modifications.".format(best_precursor_tolerance))
+        logging.info(
+            "Best precursor tolerance is the maximum value {}. You have to consider locking for for unknown modifications.".format(
+                best_precursor_tolerance))
 
     fragment_tolerances = np.linspace(start_fragment_tolerance, max_fragment_tolerance, grid_frag_steps).astype(int)
 
@@ -240,13 +244,14 @@ def combined_search(results: list = [], start_fragment_tolerance: int = 0, start
             new_value = compute_best_combination(sage_table)
             results.append(get_stats_from_sage(sage_table, ft, pt, new_value))
 
-            if (new_value - grid_best_value) / grid_best_value > 0.01: # 1% improvement
+            if (new_value - grid_best_value) / grid_best_value > 0.01:  # 1% improvement
                 best_fragment_tolerance = ft
                 best_precursor_tolerance = pt
                 best_value = new_value
                 logging.info("New Best value for fragment tolerance {}: {}".format(best_fragment_tolerance, best_value))
             else:
-                logging.info("Current value for fragment tolerance worst than previous {}: {}".format(ft, grid_best_value))
+                logging.info(
+                    "Current value for fragment tolerance worst than previous {}: {}".format(ft, grid_best_value))
                 break
 
     # Simulated Annealing
@@ -255,7 +260,6 @@ def combined_search(results: list = [], start_fragment_tolerance: int = 0, start
         logging.info("Best value from grid search is better than the initial value. Using it.")
         best_fragment_tolerance = start_fragment_tolerance
         best_precursor_tolerance = start_precursor_tolerance
-
 
     temperature = initial_temp
     current_fragment_tolerance = best_fragment_tolerance
@@ -269,7 +273,8 @@ def combined_search(results: list = [], start_fragment_tolerance: int = 0, start
             min(max_precursor_tolerance, current_precursor_tolerance + search_radius))
 
         sage_table = run_sage(fragment_tolerance=fragment_tolerance, precursor_tolerance=precursor_tolerance,
-                              fragment_type=fragment_type, mzml_files=mzml_files, fasta_path=fasta_file, sage_config_file=sage_config_file,
+                              fragment_type=fragment_type, mzml_files=mzml_files, fasta_path=fasta_file,
+                              sage_config_file=sage_config_file,
                               use_file_values=False)
         new_value = compute_best_combination(sage_table)
         results.append(get_stats_from_sage(sage_table, fragment_tolerance, precursor_tolerance, new_value))
@@ -289,18 +294,24 @@ def combined_search(results: list = [], start_fragment_tolerance: int = 0, start
 @click.command("tolerances", help="Optimize the fragment and precursor tolerances using the SAGE algorithm.")
 @click.option("--fragment-type", default="ppm", help="The type of fragment tolerance to use (ppm or da)")
 @click.option("--mzml-path", default=".", help="The path to the mzML files to use for the SAGE analysis.")
-@click.option("--initial-fragment-tolerance", help="The initial fragment tolerance to use for the optimization.", type=int, default=20)
-@click.option("--initial-precursor-tolerance", help="The initial precursor tolerance to use for the optimization.", type=int, default=20)
+@click.option("--initial-fragment-tolerance", help="The initial fragment tolerance to use for the optimization.",
+              type=int, default=20)
+@click.option("--initial-precursor-tolerance", help="The initial precursor tolerance to use for the optimization.",
+              type=int, default=20)
 @click.option("--min-fragment-tolerance", default=1, help="The minimum fragment tolerance to consider.", type=int)
 @click.option("--max-fragment-tolerance", default=50, help="The minimum precursor tolerance to consider.", type=int)
 @click.option("--min-precursor-tolerance", default=10, help="The minimum precursor tolerance to consider.", type=int)
 @click.option("--max-precursor-tolerance", default=50, help="The maximum precursor tolerance to consider.", type=int)
-@click.option("--fasta-file", default="Homo-sapiens-uniprot-reviewed-contaminants-entrap-decoy-20240615.fasta", help="The path to the fasta file to use for the SAGE analysis.")
-@click.option("--sage-config-file", default="sage-general.json", help="The path to the Sage config file to use for the SAGE analysis.")
-@click.option("--max-iterations", default=10, help="The maximum number of iterations to run the optimization.", type=int)
-def tolerances(fragment_type:str, mzml_path: str, initial_fragment_tolerance: int, initial_precursor_tolerance: int,
-         min_fragment_tolerance: int, max_fragment_tolerance: int, min_precursor_tolerance: int, max_precursor_tolerance: int,
-         fasta_file, sage_config_file, max_iterations: int):
+@click.option("--fasta-file", default="Homo-sapiens-uniprot-reviewed-contaminants-entrap-decoy-20240615.fasta",
+              help="The path to the fasta file to use for the SAGE analysis.")
+@click.option("--sage-config-file", default="sage-general.json",
+              help="The path to the Sage config file to use for the SAGE analysis.")
+@click.option("--max-iterations", default=10, help="The maximum number of iterations to run the optimization.",
+              type=int)
+def tolerances(fragment_type: str, mzml_path: str, initial_fragment_tolerance: int, initial_precursor_tolerance: int,
+               min_fragment_tolerance: int, max_fragment_tolerance: int, min_precursor_tolerance: int,
+               max_precursor_tolerance: int,
+               fasta_file, sage_config_file, max_iterations: int):
     results = []
 
     # detect absolute all the mzML files in the mzml-path
@@ -318,10 +329,10 @@ def tolerances(fragment_type:str, mzml_path: str, initial_fragment_tolerance: in
     if sage_config_file is None:
         sage_config_file = "general-sage.json"
 
-
     if initial_fragment_tolerance is not None and initial_precursor_tolerance is not None:
         sage_table = run_sage(int(initial_fragment_tolerance), int(initial_precursor_tolerance), fragment_type,
-                              mzml_files, fasta_path = fasta_file, sage_config_file=sage_config_file, use_file_values=False)
+                              mzml_files, fasta_path=fasta_file, sage_config_file=sage_config_file,
+                              use_file_values=False)
         num_psms = compute_best_combination(sage_table)
         stats = get_stats_from_sage(sage_table, initial_fragment_tolerance, initial_precursor_tolerance, num_psms)
         results.append(stats)
@@ -329,19 +340,18 @@ def tolerances(fragment_type:str, mzml_path: str, initial_fragment_tolerance: in
         best_precursor_tolerance = initial_precursor_tolerance
         best_fragment_tolerance = initial_fragment_tolerance
 
-
-
     best_fragment_tolerance, best_precursor_tolerance, results = combined_search(results=results,
-                                                                               start_fragment_tolerance=best_fragment_tolerance,
-                                                                               start_precursor_tolerance=best_precursor_tolerance,
-                                                                               min_fragment_tolerance=initial_fragment_tolerance,
-                                                                               max_fragment_tolerance=max_fragment_tolerance,
-                                                                               min_precursor_tolerance=min_precursor_tolerance,
-                                                                               max_precursor_tolerance=max_precursor_tolerance,
-                                                                               num_psms=num_psms,
-                                                                               fragment_type=fragment_type,
-                                                                               mzml_files=mzml_files,
-                                                                               max_iterations=max_iterations, fasta_file=fasta_file,
+                                                                                 start_fragment_tolerance=best_fragment_tolerance,
+                                                                                 start_precursor_tolerance=best_precursor_tolerance,
+                                                                                 min_fragment_tolerance=initial_fragment_tolerance,
+                                                                                 max_fragment_tolerance=max_fragment_tolerance,
+                                                                                 min_precursor_tolerance=min_precursor_tolerance,
+                                                                                 max_precursor_tolerance=max_precursor_tolerance,
+                                                                                 num_psms=num_psms,
+                                                                                 fragment_type=fragment_type,
+                                                                                 mzml_files=mzml_files,
+                                                                                 max_iterations=max_iterations,
+                                                                                 fasta_file=fasta_file,
                                                                                  sage_config_file=sage_config_file)
 
     print("Best tolerances found: Fragment tolerance: {} - Precursor tolerance: {}".format(best_fragment_tolerance,
@@ -351,7 +361,8 @@ def tolerances(fragment_type:str, mzml_path: str, initial_fragment_tolerance: in
     results_df = pd.DataFrame(results)
 
     # Aggregate the data to handle duplicate entries by averaging number_psms
-    df_agg = results_df.groupby(['fragment_tolerance', 'precursor_tolerance']).agg({'number_psms': 'mean'}).reset_index()
+    df_agg = results_df.groupby(['fragment_tolerance', 'precursor_tolerance']).agg(
+        {'number_psms': 'mean'}).reset_index()
 
     # Pivot the aggregated dataframe to prepare for plotting
     df_pivot = df_agg.pivot(index='fragment_tolerance', columns='precursor_tolerance', values='number_psms')
@@ -379,10 +390,11 @@ def tolerances(fragment_type:str, mzml_path: str, initial_fragment_tolerance: in
 
 @click.command("ptms", help="Extract PTMs from SAGE results.")
 @click.option("--mzml-path", default=".", help="The path to the mzML files to use for the SAGE analysis.")
-@click.option("--fasta-file", default="Homo-sapiens-uniprot-reviewed-contaminants-entrap-decoy-20240615.fasta", help="The path to the fasta file to use for the SAGE analysis.")
-@click.option("--sage-config-file", default="general-sage-ptms.json", help="The path to the Sage config file to use for the SAGE analysis.", required = True)
-@click.option("--open-search", help="Open search analysis", is_flag=True)
-def ptms(mzml_path: str, fasta_file: str, sage_config_file: str, open_search: bool):
+@click.option("--fasta-file", default="Homo-sapiens-uniprot-reviewed-contaminants-entrap-decoy-20240615.fasta",
+              help="The path to the fasta file to use for the SAGE analysis.")
+@click.option("--sage-config-file", default="general-sage-ptms.json",
+              help="The path to the Sage config file to use for the SAGE analysis.", required=True)
+def ptms(mzml_path: str, fasta_file: str, sage_config_file: str):
     # detect absolute all the mzML files in the mzml-path
 
     if not os.path.exists(mzml_path):
@@ -408,16 +420,18 @@ def ptms(mzml_path: str, fasta_file: str, sage_config_file: str, open_search: bo
         else:
             fragment_tolerance = sage_params["fragment_tol"]["da"][1]
 
-
     mzml_files = [os.path.join(mzml_path, f) for f in os.listdir(mzml_path) if f.endswith(".mzML")]
 
     global folder_plots_uui
     folder_plots_uui = str(uuid.uuid4())
     os.makedirs(folder_plots_uui)
 
-    sage_table = run_sage(fragment_type="ppm", mzml_files=mzml_files, fasta_path=fasta_file, sage_config_file=sage_config_file, use_file_values=True)
+    sage_table = run_sage(fragment_type="ppm", mzml_files=mzml_files, fasta_path=fasta_file,
+                          sage_config_file=sage_config_file, use_file_values=True)
+
     num_psms = compute_best_combination(sage_table)
-    stats = get_stats_from_sage(sage_table, fragment_tolerance=fragment_tolerance, precursor_tolerance=precursor_tolerance, number_psms=num_psms)
+    stats = get_stats_from_sage(sage_table, fragment_tolerance=fragment_tolerance,
+                                precursor_tolerance=precursor_tolerance, number_psms=num_psms)
 
     # check verbose the PTMs that percentace bigger than 1% of the psms
     logging.info("PTMs with percentage bigger than 1% of the psms:")
@@ -437,6 +451,7 @@ def cli():
     Main function to run the CLI
     """
     pass
+
 
 cli.add_command(tolerances)
 cli.add_command(ptms)

@@ -2,7 +2,7 @@
     "database": {
         "bucket_size": 8192,
         "enzyme": {
-            "missed_cleavages": 2,
+            "missed_cleavages": 0,
             "min_len": 7,
             "max_len": 50,
             "cleave_at": "KR",
@@ -30,14 +30,14 @@
             "Q": [0.984, -17.02654],
             "K": [27.9949, 43.0058, 14.01565, 28.0313]
         },
-        "generate_decoys": false,
+        "generate_decoys": true,
         "decoy_tag": "DECOY_",
-        "fasta": "Homo-sapiens-uniprot-reviewed-contaminants-entrap-decoy-20240615.fasta"
+        "fasta": "Homo-sapiens-uniprot-reviewed-20240615.fasta"
     },
     "precursor_tol": {
         "ppm": [
-            -10,
-            10
+            -20,
+            20
         ]
     },
     "fragment_tol": {
