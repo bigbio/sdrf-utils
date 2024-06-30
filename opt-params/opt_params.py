@@ -147,8 +147,8 @@ def plot_distribution(sage_table_target, sage_table_decoy, entrap_peptides, frag
 
 
 def compute_entrapment_qvalues(sage_data_frame: pd.DataFrame) -> pd.DataFrame:
-    """ compute the q values using the entrapments peptides instead of decoys.
-    :param sage_data_frame: pandas data frame with the sage results
+    """ compute the q values using the entrapment peptides instead of decoys.
+    :param sage_data_frame: panda data frame with the sage results
     """
 
     # Use inplace=True for sorting
