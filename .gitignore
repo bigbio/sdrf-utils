@@ -172,3 +172,4 @@ cython_debug/
 */*/*.pin
 */*/results.json
 */*/*/*.png
+/opt-params/Homo-sapiens-uniprot-reviewed-20240615.fasta
