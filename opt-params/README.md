@@ -5,7 +5,9 @@ This project aims to optimize the following parameters for a given SDRF annotati
 - fragment tolerance. 
 - Post-translation modifications to be considered. 
 
-The tool provides a set of tools and utilities for optimizing each of the parameters. 
+The tool provides a set of tools and utilities for optimizing each of the parameters.
+
+![Optimization Process](docs/flow.svg)
 
 ### Requirements
 
