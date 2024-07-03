@@ -38,6 +38,9 @@ The tool searches for all the PTMs with SAGE and provides a statistics about the
 | Carbamidomethyl (C)     | 4       | 57.0215  | Common Fixed modification in DDA experiments (PRIDE stats)    |
 | Oxidation (M)           | 35      | 15.9949  | Common Variable modification in DDA experiments (PRIDE stats) |
 | Acetyl (Protein N-term) | 1       | 42.0105  | Common Variable modification in DDA experiments (PRIDE stats) |
+| Deamidation (NQ)        | 5       | 0.9840   | Common Variable modification in DDA experiments (PRIDE stats) |
+|Gln->pyro-Glu (N-term Q) | 28      | -17.0265 | Common Variable modification in DDA experiments (PRIDE stats) |
+
 
 > **Note**: Please be aware that you should configure the SAGE file if the Carbamidomethyl (C) is not the fixed modification in your dataset.
 
