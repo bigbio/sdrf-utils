@@ -9,6 +9,39 @@ The tool provides a set of tools and utilities for optimizing each of the parame
 
 ![Optimization Process](docs/flow.svg)
 
+The parameters optimization tools aim to define the best tolerances (fragment and precursor) and PTMs to be considered when annotating an SDRF to be analyzed with quantms tool. This optimization is needed to get the best results from the quantms workflow data analysis.
+
+### Before optimization
+
+Before optimizing any parameter, you need at least some initial information about your project. For example, the initial precursor tolerances could be obtained from the original authors manuscript or using the [param-medic tool](param_medic.py). The initial PTMs could also be obtained by reading the manuscript or using some predefined ones: 
+ - Carbamidomethyl (C) - Fixed - 57.021464
+ - Oxidation (M) - Variable - 15.994915
+
+### Using public reanalysis or open search
+
+While the initial tolerances and PTMs could be obtained from the author's manuscript or using the param-medic tool, you can use public reanalyses or open search tools to improve the initial values. How can you do it: 
+
+- **Using gpmdb**: You can use the [gpmdb database](https://gpmdb.thegpm.org/) to search for the dataset of interest. If the dataset is present, you can select any of the models listed for the dataset and select the [given tolerances used by gpmdb](https://gpmdb.thegpm.org/thegpm-cgi/model.pl?path=/gpm/archive/323/GPM32310000436.xml&proex=-1&npep=0&ltype=) and in the list of peptides you can [see the statistics for each PTM](https://gpmdb.thegpm.org/thegpm-cgi/phplctab.pl?path=/gpm/archive/323/GPM32310000436.xml&proex=-1&npep=0&ltype=). 
+
+- **Using FragPipe and MSfragger**: While for some users it will not be possible to use FragPipe because of licenses or other reasons; if it is available for you, you can run the tool with some files from your dataset and using OpenSearch workflow to see the most relevant PTMs in your dataset. The PTM-Shepherd will generate a [report like this](https://github.com/bigbio/multiomics-configs/blob/master/opt-params/PXD000561/PXD000561.global.modsummary.tsv); this report could be use to select (based on the % of PSMs) the most relevant PTMs for your dataset.
+
+### PTMs Optimization
+
+We have developed a Python tool that uses [SAGE tool](https://github.com/lazear/sage) to find out which PTMs are present in your sample according to the search engine. The approach is simple, we created a [sage configuration template](general-sage-ptms-full.json) with the most common PTMs found in public datasets. 
+
+> **Note**: [David L. Tabb et al.](https://doi.org/10.1016/j.ijms.2019.116266) previously suggested a list of common PTMs that should always be included in DDA database search analysis. Other authors have also found multiple PTMs that are consitentively found in public datasets including the [MSFragger team](10.1038/nmeth.4256).
+ 
+The tool searches for all the PTMs with SAGE and provides a statistics about the % of PSMs from the total number of PSMs that are identified for each given PSM. A file report is generated with the name `sage-ptms-report.tsv` that contains the information about the PTMs found in the dataset. In addition, the modifications with more than 1% of the PSMs are printed in the console. Here is the list of PTMs included in the configuration file for full search: 
+
+| PTM                     | Unimod  | Mass     | Comments                                                      |
+|-------------------------|---------|----------|---------------------------------------------------------------|
+| Carbamidomethyl (C)     | 4       | 57.0215  | Common Fixed modification in DDA experiments (PRIDE stats)    |
+| Oxidation (M)           | 35      | 15.9949  | Common Variable modification in DDA experiments (PRIDE stats) |
+| Acetyl (Protein N-term) | 1       | 42.0105  | Common Variable modification in DDA experiments (PRIDE stats) |
+
+> **Note**: Please be aware that you should configure the SAGE file if the Carbamidomethyl (C) is not the fixed modification in your dataset.
+
+
 ### Requirements
 
 To run this project, ensure you have the following installed:
