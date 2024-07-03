@@ -33,14 +33,40 @@ We have developed a Python tool that uses [SAGE tool](https://github.com/lazear/
  
 The tool searches for all the PTMs with SAGE and provides a statistics about the % of PSMs from the total number of PSMs that are identified for each given PSM. A file report is generated with the name `sage-ptms-report.tsv` that contains the information about the PTMs found in the dataset. In addition, the modifications with more than 1% of the PSMs are printed in the console. Here is the list of PTMs included in the configuration file for full search: 
 
-| PTM                     | Unimod  | Mass     | Comments                                                      |
-|-------------------------|---------|----------|---------------------------------------------------------------|
-| Carbamidomethyl (C)     | 4       | 57.0215  | Common Fixed modification in DDA experiments (PRIDE stats)    |
-| Oxidation (M)           | 35      | 15.9949  | Common Variable modification in DDA experiments (PRIDE stats) |
-| Acetyl (Protein N-term) | 1       | 42.0105  | Common Variable modification in DDA experiments (PRIDE stats) |
-| Deamidation (NQ)        | 5       | 0.9840   | Common Variable modification in DDA experiments (PRIDE stats) |
-|Gln->pyro-Glu (N-term Q) | 28      | -17.0265 | Common Variable modification in DDA experiments (PRIDE stats) |
+| PTM                       | Unimod | Mass     | Comments                                                                          |
+|---------------------------|--------|----------|-----------------------------------------------------------------------------------|
+| Carbamidomethyl (C)       | 4      | 57.0215  | Common Fixed modification in DDA experiments (PRIDE stats)                        |
+| Oxidation (M/P)           | 35     | 15.9949  | [Recommended by David L. Tabb et al](https://doi.org/10.1016/j.ijms.2019.116266)  |
+| Dioxidation (M/P)         | 425    | 31.9898  | [Recommended by David L. Tabb et al](https://doi.org/10.1016/j.ijms.2019.116266)  |
+| Acetyl (Protein N-term)   | 1      | 42.0105  | Common Variable modification in DDA experiments (PRIDE stats)                     |
+| Deamidation (N/Q)         | 5      | 0.9840   | Common Variable modification in DDA experiments (PRIDE stats)                     |
+| Gln->pyro-Glu (N-term Q)  | 28     | -17.0265 | Common Variable modification in DDA experiments (PRIDE stats)                     |
+| Amidated (Protein C-term) | 2      | -0.9840  | Common Variable modification in DDA experiments (PRIDE stats)                     |
+| Formylation (K/C-Term)    | 122    |27.9949   | Common Fixed modification in DDA experiments (PRIDE stats)                        |
+| Glu->pyro-Glu (N-term E)  | 27     | -18.0106 | Common Variable modification in DDA experiments (PRIDE stats)                     |
+| Dimethyl  (K/N-term)      | 36     | 28.0313  | [Recommended by David L. Tabb et al](https://doi.org/10.1016/j.ijms.2019.116266)  |
 
+How to edit the sage ptms configuration file:
+
+In the section dedicated to PTMs, feel free to delete or add any PTM mass in the corresponding aminoacid position. 
+
+```json
+{
+    "static_mods": {
+            "C": 57.0215
+        },
+        "variable_mods": {
+            "M": [15.994, 31.9898],
+            "P": [15.994, 31.9898],
+            "[": [42.0105, 27.9949, 43.0058, 14.01565, 28.0313, 57.0215],
+            "]": [-0.9840],
+            "N": [0.984],
+            "Q": [0.984, -17.02654],
+            "K": [27.9949, 43.0058, 14.01565, 28.0313]
+        },
+}
+```
+The variable_mods are for the variable modifications and the static_mods are for the fixed modifications.
 
 > **Note**: Please be aware that you should configure the SAGE file if the Carbamidomethyl (C) is not the fixed modification in your dataset.
 
