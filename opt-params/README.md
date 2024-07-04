@@ -33,22 +33,25 @@ We have developed a Python tool that uses [SAGE tool](https://github.com/lazear/
  
 The tool searches for all the PTMs with SAGE and provides a statistics about the % of PSMs from the total number of PSMs that are identified for each given PSM. A file report is generated with the name `sage-ptms-report.tsv` that contains the information about the PTMs found in the dataset. In addition, the modifications with more than 1% of the PSMs are printed in the console. Here is the list of PTMs included in the configuration file for full search: 
 
-| PTM                       | Unimod | Mass   | Comments                                                                          |
-|---------------------------|--------|--------|-----------------------------------------------------------------------------------|
-| Carbamidomethyl (C)       | 4      |57.0215 | Common Fixed modification in DDA experiments (PRIDE stats)                        |
-| Oxidation (M/P)           | 35     |15.9949 | [Recommended by David L. Tabb et al](https://doi.org/10.1016/j.ijms.2019.116266)  |
-| Dioxidation (M/P)         | 425    |31.9898 | [Recommended by David L. Tabb et al](https://doi.org/10.1016/j.ijms.2019.116266)  |
-| Acetyl (Protein N-term)   | 1      |42.0105 | Common Variable modification in DDA experiments (PRIDE stats)                     |
-| Deamidation (N/Q)         | 5      |0.9840  | Common Variable modification in DDA experiments (PRIDE stats)                     |
-| Gln->pyro-Glu (N-term Q)  | 28     |-17.0265| Common Variable modification in DDA experiments (PRIDE stats)                     |
-| Amidated (Protein C-term) | 2      |-0.9840 | Common Variable modification in DDA experiments (PRIDE stats)                     |
-| Formylation (K/C-Term)    | 122    |27.9949 | Common Fixed modification in DDA experiments (PRIDE stats)                        |
-| Glu->pyro-Glu (N-term E)  | 27     |-18.0106| Common Variable modification in DDA experiments (PRIDE stats)                     |
-| Dimethyl  (K/N-term)      | 36     |28.0313 | [Recommended by David L. Tabb et al](https://doi.org/10.1016/j.ijms.2019.116266)  |
-| Carbamidomethyl (N-term)  | 4      |57.0215 | [Recommended by David L. Tabb et al](https://doi.org/10.1016/j.ijms.2019.116266)  |
-| Cation:Fe[III] (D/E)      |1870    |52.9114 | [Recommended by MsFragger team](https://doi.org/10.1038/nmeth.4256)               |
+| PTM                        | Unimod | Mass   | Comments                                                                         |
+|----------------------------|--------|--------|----------------------------------------------------------------------------------|
+| Carbamidomethyl (C)        | 4      |57.0215 | Common Fixed modification in DDA experiments (PRIDE stats)                       |
+| Oxidation (M/P)            | 35     |15.9949 | [Recommended by David L. Tabb et al](https://doi.org/10.1016/j.ijms.2019.116266) |
+| Dioxidation (M/P)          | 425    |31.9898 | [Recommended by David L. Tabb et al](https://doi.org/10.1016/j.ijms.2019.116266) |
+| Acetyl (Protein N-term)    | 1      |42.0105 | Common Variable modification in DDA experiments (PRIDE stats)                    |
+| Deamidation (N/Q)          | 5      |0.9840  | Common Variable modification in DDA experiments (PRIDE stats)                    |
+| Gln->pyro-Glu (N-term Q)   | 28     |-17.0265| Common Variable modification in DDA experiments (PRIDE stats)                    |
+| Amidated (Protein C-term)  | 2      |-0.9840 | Common Variable modification in DDA experiments (PRIDE stats)                    |
+| Formylation (K/C-Term)     | 122    |27.9949 | Common Fixed modification in DDA experiments (PRIDE stats)                       |
+| Glu->pyro-Glu (N-term E)   | 27     |-18.0106| Common Variable modification in DDA experiments (PRIDE stats)                    |
+| Dimethyl  (K/N-term)       | 36     |28.0313 | [Recommended by David L. Tabb et al](https://doi.org/10.1016/j.ijms.2019.116266) |
+| Carbamidomethyl (N-term)   | 4      |57.0215 | [Recommended by David L. Tabb et al](https://doi.org/10.1016/j.ijms.2019.116266) |
+| Cation:Fe[III] (D/E)       | 1870   |52.9114 | [Recommended by MsFragger team](https://doi.org/10.1038/nmeth.4256)              |
+| Amidation (C-term)         | 3      |-0.9840 | Common Variable modification in DDA experiments (PRIDE stats)                    |
+| Methyl (N-term)            | 34     |14.01565| Common Variable modification in DDA experiments (PRIDE stats) |  
+
  
-> **Note**: If you want to suggest a new PTM please open an issue in the repository.  
+> **Note**: If you want to suggest a new PTM please open an issue in the repository. In addition, if you have phosphorylation or other biological mods, please add then to the configuration file.
 
 How to edit the sage ptms configuration file:
 
