@@ -7,13 +7,17 @@ from collections import Counter
 from typing import Tuple, List, Dict
 import json
 import os
-
+from sagepy.core import EnzymeBuilder, SageSearchConfiguration, validate_mods, validate_var_mods, \
+    Scorer, RawSpectrum, SpectrumProcessor, Precursor, Tolerance, IonType
 import numpy as np
 import pandas as pd
-import subprocess
 import matplotlib.pyplot as plt
 from pandas import DataFrame
 import click
+from pyteomics import mzml
+import concurrent.futures as cf
+
+from tqdm import tqdm
 
 logging.basicConfig(level=logging.INFO)
 
@@ -22,58 +26,296 @@ folder_sperator = os.path.sep
 
 CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
 
+indexed_db = None
 
-def run_sage(fragment_tolerance: int = 0, precursor_tolerance: int = 0, fragment_type: str = "ppm",
-             mzml_files: list = [], fasta_path: str = "", sage_config_file: str = None,
-             use_file_values: bool = True) -> DataFrame:
+
+def generate_indexed_db(fasta_path, sage_config_file):
     if sage_config_file is None:
         raise ValueError("The sage config file is required.")
 
     with open(sage_config_file) as f:
-        data = json.load(f)
+        param_data = json.load(f)
+        cleave_at = param_data["database"]["enzyme"]["cleave_at"]
+        missed_cleavages = param_data["database"]["enzyme"]["missed_cleavages"]
+        min_len = param_data["database"]["enzyme"]["min_len"]
+        max_len = param_data["database"]["enzyme"]["max_len"]
+        restrict = param_data["database"]["enzyme"]["restrict"]
+        static_mods = param_data["database"]["static_mods"]
+        variable_mods = param_data["database"]["variable_mods"]
+        fragment_min_mz = param_data["database"]["fragment_min_mz"]
+        fragment_max_mz = param_data["database"]["fragment_max_mz"]
+        peptide_min_mass = param_data["database"]["peptide_min_mass"]
+        peptide_max_mass = param_data["database"]["peptide_max_mass"]
+        ion_kinds = param_data["database"]["ion_kinds"]
+        min_ion_index = param_data["database"]["min_ion_index"]
+        max_variable_mods = param_data["database"]["max_variable_mods"]
+        generate_decoys = param_data["database"]["generate_decoys"]
+        decoy_tag = param_data["database"]["decoy_tag"]
+
+    # configure a trypsin-like digestor of fasta files
+    enzyme_builder = EnzymeBuilder(
+        missed_cleavages=missed_cleavages,
+        min_len=min_len,
+        max_len=max_len,
+        cleave_at=cleave_at,
+        restrict=restrict,
+        c_terminal=True
+    )
+
+    # # generate static cysteine modification
+    # static_mods = {k: v for k, v in [SAGE_KNOWN_MODS.cysteine_static()]}
+    #
+    # # generate variable methionine modification
+    # variable_mods = {k: v for k, v in [SAGE_KNOWN_MODS.methionine_variable()]}
+
+    # generate SAGE compatible mod representations
+    static = validate_mods(static_mods)
+    variab = validate_var_mods(variable_mods)
+
+    with open(fasta_path, 'r') as infile:
+        fasta = infile.read()
+
+    # generate IonType class
+    ion_kinds = [IonType(ion).get_py_ptr() for ion in ion_kinds]
+
+    # set-up a config for a sage-database
+    sage_config = SageSearchConfiguration(
+        fasta=fasta,
+        static_mods=static,
+        variable_mods=variab,
+        enzyme_builder=enzyme_builder,
+        fragment_min_mz=fragment_min_mz,
+        fragment_max_mz=fragment_max_mz,
+        peptide_min_mass=peptide_min_mass,
+        peptide_max_mass=peptide_max_mass,
+        ion_kinds=ion_kinds,
+        generate_decoys=generate_decoys,
+        decoy_tag=decoy_tag,
+        min_ion_index=min_ion_index,
+        max_variable_mods=max_variable_mods,
+        bucket_size=int(np.power(2, 14))
+    )
+
+    # generate the database for searching against
+    global indexed_db
+    indexed_db = sage_config.generate_indexed_database()
+
+
+def mass_to_mod(mass: float) -> str:
+    """ Convert a mass to a UNIMOD modification annotation.
+
+    Args:
+        mass: a mass in Da
+
+    Returns:
+        a UNIMOD modification annotation
+    """
+    maybe_key = int(np.round(mass))
+    mod_dict = {
+        1: '[UNIMOD:7]',
+        42: '[UNIMOD:1]',
+        57: '[UNIMOD:4]',
+        80: '[UNIMOD:21]',
+        16: '[UNIMOD:35]',
+        119: '[UNIMOD:312]',
+    }
+    # try to translate to UNIMOD annotation
+    try:
+        return mod_dict[maybe_key]
+    except KeyError:
+        raise KeyError(f"Rounded mass not in dict: {maybe_key}")
+
+
+# Adapted from https://github.com/theGreatHerrLebert/sagepy/blob/v0.2.20-alpha/sagepy/sagepy/core/peptide.py#L125C1
+# Will update in next release https://github.com/theGreatHerrLebert/sagepy/pull/12/files
+def to_unimod_sequence(modifications, sequence) -> str:
+    """ Get Peptide sequence with UNIMOD modification annotations.
+
+    Returns:
+        str: Peptide sequence with UNIMOD modification annotations.
+    """
+
+    seq = ''
+
+    for i, (s, m) in enumerate(zip(sequence, modifications)):
+        if m != 0:
+            if i == 0:
+                if mass_to_mod(m) == '[UNIMOD:1]':
+                    seq += f'{mass_to_mod(m)}{s}'
+                else:
+                    seq += f'{s}{mass_to_mod(m)}'
+            else:
+                seq += f'{s}{mass_to_mod(m)}'
+        else:
+            seq += s
+
+    return seq
+
+
+def run_one_raw(spec_file, param_data):
+    global indexed_db
+
+    raw_spectrums = mzml.MzML(spec_file)
+    res = []
+
+    # loading parameters
+    fragment_min_mz = param_data["database"]["fragment_min_mz"]
+    fragment_max_mz = param_data["database"]["fragment_max_mz"]
+    deisotope_bool = param_data["deisotope"]
+    min_matched_peaks = param_data["min_matched_peaks"]
+    min_isotope_err = param_data["min_isotope_err"]
+    max_isotope_err = param_data["max_isotope_err"]
+    min_precursor_charge = param_data["min_precursor_charge"]
+    max_precursor_charge = param_data["max_precursor_charge"]
+    chimera = param_data["chimera"]
+    report_psms = param_data["report_psms"]
+    annotate_matches = param_data["annotate_matches"]
+    max_fragment_charge = param_data["max_fragment_charge"]
+
+    if "ppm" in param_data["precursor_tol"]:
+        precursor_tolerance = Tolerance(
+            ppm=(param_data["precursor_tol"]["ppm"][0], param_data["precursor_tol"]["ppm"][1]))
+    else:
+        precursor_tolerance = Tolerance(
+            ppm=(param_data["precursor_tol"]["da"][0], param_data["precursor_tol"]["da"][1]))
+
+    if "ppm" in param_data["fragment_tol"]:
+        fragment_tolerance = Tolerance(ppm=(param_data["fragment_tol"]["ppm"][0], param_data["fragment_tol"]["ppm"][1]))
+    else:
+        fragment_tolerance = Tolerance(ppm=(param_data["fragment_tol"]["da"][0], param_data["fragment_tol"]["da"][1]))
+
+    # Begin search and score
+    for spectrum in tqdm(raw_spectrums):
+        if spectrum["ms level"] == 1:
+            continue
+        selected_ion = spectrum["precursorList"]["precursor"][0]["selectedIonList"]["selectedIon"][0][
+            "selected ion m/z"]
+        charge = spectrum["precursorList"]["precursor"][0]["selectedIonList"]["selectedIon"][0]["charge state"]
+        mz = spectrum["m/z array"].astype(np.float32)
+        intensity = spectrum["intensity array"].astype(np.float32)
+        precursor = Precursor(
+            charge=charge,
+            mz=selected_ion,
+        )
+        raw_spectrum = RawSpectrum(
+            file_id=1,
+            spec_id=spectrum["id"],
+            total_ion_current=spectrum["total ion current"],
+            precursors=[precursor],
+            mz=mz,
+            intensity=intensity
+        )
+
+        spec_processor = SpectrumProcessor(take_top_n=75, min_fragment_mz=fragment_min_mz,
+                                           max_fragment_mz=fragment_max_mz,
+                                           deisotope=deisotope_bool)
+        query = spec_processor.process(raw_spectrum)
+        scorer = Scorer(report_psms=report_psms, min_matched_peaks=min_matched_peaks,
+                        precursor_tolerance=precursor_tolerance,
+                        fragment_tolerance=fragment_tolerance, min_isotope_err=min_isotope_err,
+                        max_isotope_err=max_isotope_err,
+                        min_precursor_charge=min_precursor_charge, max_precursor_charge=max_precursor_charge,
+                        min_fragment_mass=fragment_min_mz, max_fragment_mass=fragment_max_mz, chimera=chimera,
+                        annotate_matches=annotate_matches, max_fragment_charge=max_fragment_charge)
+
+        results = scorer.score(db=indexed_db, spectrum=query)
+        for feature in results:
+            peptide = indexed_db[feature.peptide_idx]
+            sequence = peptide.sequence
+            modifications = peptide.modifications
+            unimod_sequence = to_unimod_sequence(modifications, sequence)
+            precursor_ppm = abs(feature.expmass - feature.calcmass - feature.isotope_error) * 2e6 / (feature.expmass + feature.calcmass- feature.isotope_error)
+            res.append({"file_id": feature.file_id, "spec_id": feature.spec_id, "peptide": unimod_sequence,
+                        "proteins": ";".join(peptide.proteins), "rank": feature.rank,
+                        "label": feature.label, "exp.mass": feature.expmass, "cal.mass": feature.calcmass,
+                        "charge": feature.charge, "retention time": feature.rt,
+                        "precursor_ppm": precursor_ppm, "fragment_ppm": feature.average_ppm,
+                        "delta mass": feature.delta_mass, "isotope error": feature.isotope_error,
+                        "hyperscore": feature.hyperscore, "delta_next": feature.delta_next,
+                        "delta_best": feature.delta_best,
+                        "matched peaks": feature.matched_peaks, "missed cleavages": feature.missed_cleavages,
+                        "scored candidates": feature.scored_candidates,
+                        "sage_discriminant_score": feature.discriminant_score,
+                        "posterior error": feature.posterior_error,
+                        "spectrum_q": feature.spectrum_q, "peptide q": feature.peptide_q,
+                        "protein q": feature.protein_q,
+                        "ms2 intensity": feature.ms2_intensity})
+
+    res = pd.DataFrame(res, index=None)
+    return res
+
+
+def run_sage(fragment_tolerance: int = 0, precursor_tolerance: int = 0, fragment_type: str = "ppm",
+             mzml_files: list = [], sage_config_file: str = None,
+             use_file_values: bool = True, n_process=4) -> DataFrame:
+    if sage_config_file is None:
+        raise ValueError("The sage config file is required.")
+
+    with open(sage_config_file) as f:
+        param_data = json.load(f)
+
+        # loading and set default parameters
+        param_data["database"]["fragment_min_mz"] = param_data["database"]["fragment_min_mz"] if "fragment_min_mz" in \
+                                                                                                 param_data[
+                                                                                                     "database"] else 150
+        param_data["database"]["fragment_max_mz"] = param_data["database"]["fragment_max_mz"] if "fragment_max_mz" in \
+                                                                                                 param_data[
+                                                                                                     "database"] else 2000
+        param_data["deisotope"] = param_data["deisotope"] if "deisotope" in param_data else True
+        param_data["min_matched_peaks"] = param_data["min_matched_peaks"] if "min_matched_peaks" in param_data else 6
+        param_data["min_isotope_err"] = param_data["min_isotope_err"] if "min_isotope_err" in param_data else -1
+        param_data["max_isotope_err"] = param_data["max_isotope_err"] if "max_isotope_err" in param_data else 3
+        param_data["min_precursor_charge"] = param_data[
+            "min_precursor_charge"] if "min_precursor_charge" in param_data else 2
+        param_data["max_precursor_charge"] = param_data[
+            "max_precursor_charge"] if "max_precursor_charge" in param_data else 4
+        param_data["chimera"] = param_data["chimera"] if "chimera" in param_data else False
+        param_data["report_psms"] = param_data["report_psms"] if "report_psms" in param_data else 1
+        param_data["annotate_matches"] = param_data["annotate_matches"] if "annotate_matches" in param_data else False
+        param_data["max_fragment_charge"] = param_data[
+            "max_fragment_charge"] if "max_fragment_charge" in param_data else 1
 
     if fragment_tolerance != 0 and precursor_tolerance != 0 or not use_file_values:
-        data["precursor_tol"]["ppm"] = [int(-1 * precursor_tolerance), int(precursor_tolerance)]
+        param_data["precursor_tol"]["ppm"] = [int(-1 * precursor_tolerance), int(precursor_tolerance)]
+        precursor_tolerance = Tolerance(ppm=(int(-1 * precursor_tolerance), int(precursor_tolerance)))
         if fragment_type == "ppm":
-            data["fragment_tol"][fragment_type] = [int(-1 * fragment_tolerance), int(fragment_tolerance)]
+            param_data["fragment_tol"][fragment_type] = [int(-1 * fragment_tolerance), int(fragment_tolerance)]
+            fragment_tolerance = Tolerance(ppm=(int(-1 * fragment_tolerance), int(fragment_tolerance)))
         else:
-            data["fragment_tol"][fragment_type] = [-1 * fragment_tolerance, fragment_tolerance]
+            param_data["fragment_tol"][fragment_type] = [-1 * fragment_tolerance, fragment_tolerance]
+            fragment_tolerance = Tolerance(da=(-1 * fragment_tolerance, fragment_tolerance))
+
     else:
         logging.info("Using the values from the file.")
-        if "ppm" in data["precursor_tol"]:
-            precursor_tolerance = data["precursor_tol"]["ppm"][1]
+        if "ppm" in param_data["precursor_tol"]:
+            precursor_tolerance = param_data["precursor_tol"]["ppm"][1]
         else:
-            precursor_tolerance = data["precursor_tol"]["da"][1]
+            precursor_tolerance = param_data["precursor_tol"]["da"][1]
 
-        if "ppm" in data["fragment_tol"]:
-            fragment_tolerance = data["fragment_tol"]["ppm"][1]
+        if "ppm" in param_data["fragment_tol"]:
+            fragment_tolerance = param_data["fragment_tol"]["ppm"][1]
         else:
-            fragment_tolerance = data["fragment_tol"]["da"][1]
+            fragment_tolerance = param_data["fragment_tol"]["da"][1]
 
-    data["mzml_paths"] = mzml_files
-
-    if os.path.exists(fasta_path):
-        data["database"]["fasta"] = fasta_path
-    else:
-        logging.error(f"File {fasta_path} does not exist.")
-        raise FileNotFoundError(f"File {fasta_path} does not exist.")
+    param_data["mzml_paths"] = mzml_files
 
     temp_sage_file = str(uuid.uuid4()) + ".json"
     with open(temp_sage_file, "w") as f:
-        json.dump(data, f, indent=4)
+        json.dump(param_data, f, indent=4)
 
     logging.info("Running SAGE with fragment tolerance: {} and precursor tolerance: {}".format(fragment_tolerance,
                                                                                                precursor_tolerance))
 
-    result = subprocess.run(["sage", temp_sage_file, "--write-pin"], capture_output=True, text=True)
-    os.remove(temp_sage_file)
+    sage_table = pd.DataFrame()
+    tasks = []
 
-    if result.returncode != 0:
-        logging.error("Error running SAGE.")
-        logging.error(result.stderr)
-        raise ValueError("Error running SAGE.")
+    with cf.ProcessPoolExecutor(n_process) as pp:
+        for m in mzml_files:
+            tasks.append(pp.submit(run_one_raw, m, param_data))
 
-    sage_table = pd.read_csv("results.sage.tsv", sep="\t")
+        for future in cf.as_completed(tasks):
+            sage_table = pd.concat([sage_table, future.result()], ignore_index=True)
+
     sage_table = compute_entrapment_qvalues(sage_table)
     return sage_table
 
@@ -214,8 +456,8 @@ def combined_search(results: list = [], start_fragment_tolerance: int = 0, start
     grid_best_value = 1
     for ft in precursor_tolerances:
         sage_table = run_sage(fragment_tolerance=start_fragment_tolerance, precursor_tolerance=ft,
-                              fragment_type=fragment_type, mzml_files=mzml_files, fasta_path=fasta_file,
-                              sage_config_file=sage_config_file, use_file_values=False)
+                              fragment_type=fragment_type, mzml_files=mzml_files,
+                              sage_config_file=sage_config_file, use_file_values=False, n_process=4)
         new_value = compute_best_combination(sage_table)
         results.append(get_stats_from_sage(sage_table, start_fragment_tolerance, ft, new_value))
 
@@ -239,7 +481,7 @@ def combined_search(results: list = [], start_fragment_tolerance: int = 0, start
     for ft in fragment_tolerances:
         for pt in precursor_tolerances:
             sage_table = run_sage(fragment_tolerance=ft, precursor_tolerance=pt,
-                                  fragment_type=fragment_type, mzml_files=mzml_files, fasta_path=fasta_file,
+                                  fragment_type=fragment_type, mzml_files=mzml_files,
                                   sage_config_file=sage_config_file, use_file_values=False)
             new_value = compute_best_combination(sage_table)
             results.append(get_stats_from_sage(sage_table, ft, pt, new_value))
@@ -273,7 +515,7 @@ def combined_search(results: list = [], start_fragment_tolerance: int = 0, start
             min(max_precursor_tolerance, current_precursor_tolerance + search_radius))
 
         sage_table = run_sage(fragment_tolerance=fragment_tolerance, precursor_tolerance=precursor_tolerance,
-                              fragment_type=fragment_type, mzml_files=mzml_files, fasta_path=fasta_file,
+                              fragment_type=fragment_type, mzml_files=mzml_files,
                               sage_config_file=sage_config_file,
                               use_file_values=False)
         new_value = compute_best_combination(sage_table)
@@ -304,7 +546,7 @@ def combined_search(results: list = [], start_fragment_tolerance: int = 0, start
 @click.option("--max-precursor-tolerance", default=50, help="The maximum precursor tolerance to consider.", type=int)
 @click.option("--fasta-file", default="Homo-sapiens-uniprot-reviewed-contaminants-entrap-decoy-20240615.fasta",
               help="The path to the fasta file to use for the SAGE analysis.")
-@click.option("--sage-config-file", default="sage-general.json",
+@click.option("--sage-config-file", default="general-sage.json",
               help="The path to the Sage config file to use for the SAGE analysis.")
 @click.option("--max-iterations", default=10, help="The maximum number of iterations to run the optimization.",
               type=int)
@@ -330,9 +572,18 @@ def tolerances(fragment_type: str, mzml_path: str, initial_fragment_tolerance: i
         sage_config_file = "general-sage.json"
 
     if initial_fragment_tolerance is not None and initial_precursor_tolerance is not None:
+
+        if os.path.exists(fasta_file):
+            logging.info(f"Generating indexed database from {fasta_file}.")
+            generate_indexed_db(fasta_file, sage_config_file)
+        else:
+            logging.error(f"File {fasta_file} does not exist.")
+            raise FileNotFoundError(f"File {fasta_file} does not exist.")
+
         sage_table = run_sage(int(initial_fragment_tolerance), int(initial_precursor_tolerance), fragment_type,
-                              mzml_files, fasta_path=fasta_file, sage_config_file=sage_config_file,
-                              use_file_values=False)
+                              mzml_files, sage_config_file=sage_config_file,
+                              use_file_values=False, n_process=4)
+        sage_table.to_csv("sage_table.csv", index=False)
         num_psms = compute_best_combination(sage_table)
         stats = get_stats_from_sage(sage_table, initial_fragment_tolerance, initial_precursor_tolerance, num_psms)
         results.append(stats)

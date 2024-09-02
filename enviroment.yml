@@ -8,7 +8,6 @@ channels:
 dependencies:
   - bioconda::thermorawfileparser=1.4.2
   - bioconda::crux-toolkit
-  - bioconda::sage-proteomics
   - pandas
   - matplotlib
   - scikit-learn
@@ -16,5 +15,8 @@ dependencies:
   - seaborn
   - numpy
   - pyarrow
+  - sagepy=0.2.20
+  - pyteomics
+  - tqdm
 
 
