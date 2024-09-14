@@ -19,11 +19,10 @@
         "min_ion_index": 2,
         "max_variable_mods": 3,
         "static_mods": {
-            "C": 57.0215
+            "C": "[UNIMOD:4]"
         },
         "variable_mods": {
-            "M": [15.994],
-            "N": [0.984]
+            "M": ["[UNIMOD:35]"]
         },
         "generate_decoys": false,
         "decoy_tag": "DECOY_",
@@ -59,6 +58,8 @@
     "max_peaks": 300,
     "max_fragment_charge": 1,
     "min_matched_peaks": 4,
+    "annotate_matches": true,
+    "search_thread": 4,
     "mzml_paths": [
         "./20150901_QEp1_LC7_PhGe_SA_Plate1E_45_6.mzML",
         "./20150618_QEp1_LC7_PhGe_SA_Plate1B_45_1.mzML",
