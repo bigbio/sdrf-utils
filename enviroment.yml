@@ -15,7 +15,8 @@ dependencies:
   - seaborn
   - numpy
   - pyarrow
-  - sagepy=0.2.20
+  - sagepy=0.2.22
+  - sagepy-connector=0.2.22
   - pyteomics
   - tqdm
 
