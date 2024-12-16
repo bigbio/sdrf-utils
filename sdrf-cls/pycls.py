@@ -1,5 +1,6 @@
 import gzip
 import os
+import re
 from typing import Union
 
 import click
@@ -20,6 +21,19 @@ nlp = spacy.load("en_core_web_md")  # Load the spacy model
 
 
 def get_cell_line_code(sdrf_file):
+    """
+    Extracts a list of unique cell line codes from an SDRF file.
+
+    Reads the specified SDRF file and attempt to retrieve unique values
+    from the 'characteristics[cell line]' column. If the column is not
+    found, an error message is printed.
+
+    Parameters:
+        sdrf_file (str): The path to the SDRF file to be processed.
+
+    Returns:
+        list: A list of unique cell line codes, or None if the column is not found.
+    """
     sdrf = pd.read_csv(sdrf_file, sep="\t")
     try:
         cl_list = sdrf["characteristics[cell line]"].unique().tolist()
@@ -30,9 +44,19 @@ def get_cell_line_code(sdrf_file):
 
 def get_sampling_site(cellosaurus_comment: str) -> Union[None, str]:
     """
-    Extract the sampling site from the cellosaurus comment field
-    :param cellosaurus_comment: Cellosaurus comment field
-    :return: Sampling site
+    Extracts the sampling site from a Cellosaurus comment string.
+
+    This function searches for a specific pattern in the provided
+    Cellosaurus comment to identify the tissue sampling site. The
+    pattern includes keywords like "In situ", "Colon", and an UBERON
+    accession number. If a match is found, the tissue type is returned;
+    otherwise, None is returned.
+
+    Args:
+        cellosaurus_comment (str): The comment string from which to extract
+        the sampling site information.
+    Returns:
+        Union[None, str]: The tissue sampling site if found, otherwise None.
     """
     # The regular expression pattern to match "In situ", "Colon", and the UBERON accession
     pattern = r"Derived from site:\s*(.+?);\s*(.+?);\s*UBERON=(UBERON_\d{7})"
@@ -1276,16 +1300,25 @@ def cl_database(
     unknown: str,
 ) -> None:
     """
-    The following function creates a vector database using LLMs using the CelloSaurus database, BTO and EFO ontologies
-    :param database: Current database file with cell lines
-    :param cellosaurus_database: CelloSaurus database file
-    :param ea_database: EA Atlas database file
-    :param cell_passports_database: Cell passports database file
-    :param sdrf_path: SDRF folder with all existing SDRF files
-    :param include_all_cellpassports: Include all cell passports cell lines
-    :param ai_synonyms: AI synonyms file
-    :param unknown: Output for unknown cell lines in cellosaurus
-    :return:
+    Creates and updates a cell lines metadata database for annotating cell lines in SDRFs.
+
+    This command-line tool processes various database files and SDRF files to compile
+    a comprehensive cell line database. It checks for existing cell lines, adds new ones,
+    and writes the updated database to a file. It also logs any cell lines that could not
+    be found in the provided databases.
+
+    Parameters:
+        database (str): Path to the current cell line database file.
+        cellosaurus_database (str): Path to the CelloSaurus database file.
+        ea_database (str): Path to the EA Atlas database file.
+        cell_passports_database (str): Path to the cell passports database file.
+        sdrf_path (str): Path to the folder containing SDRF files.
+        include_all_cellpassports (bool): Flag to include all cell passports cell lines.
+        ai_synonyms (str): Path to the AI synonyms file.
+        unknown (str): Path to the output file for unknown cell lines.
+
+    Returns:
+        None
     """
 
     cls = []  # List of cell lines
@@ -1370,6 +1403,20 @@ def cl_database(
         return None
 
     def find_cell_line_ea_atlas(cl: str, ea_atlas: dict) -> Union[dict, None]:
+        """
+        Searches for a cell line in the EA Atlas database.
+
+        Iterates through the EA Atlas entries to find a match for the given cell line
+        name or its synonyms. Returns the corresponding entry if found, otherwise
+        returns None.
+
+        Parameters:
+            cl (str): The cell line name to search for.
+            ea_atlas (dict): The EA Atlas database represented as a dictionary.
+
+        Returns:
+            dict or None: The EA Atlas entry for the cell line if found, otherwise None.
+        """
         for key, ea_atlas_entry in ea_atlas.items():
             if ea_atlas_entry["cell line"].lower() == cl.lower():
                 return ea_atlas_entry
@@ -1380,6 +1427,19 @@ def cl_database(
         return None
 
     def find_in_synonyms_table(cl: str, ai_synonyms: dict) -> Union[str, None]:
+        """
+        Searches for a cell line in the ai_synonyms dictionary that matches the given
+        cell line identifier `cl`. If an exact match is found, it returns the cell line.
+        If not, it checks the synonyms for a match and returns the corresponding cell
+        line if found. If no match is found, it returns the original `cl`.
+
+        Parameters:
+            cl (str): The cell line identifier to search for.
+            ai_synonyms (dict): A dictionary containing cell line entries with possible synonyms.
+
+        Returns:
+            str: The matched cell line from the dictionary or the original `cl` if no match is found.
+        """
         for key, ai_synonyms_entry in ai_synonyms.items():
             if ai_synonyms_entry["cell line"].lower() == cl.lower():
                 return ai_synonyms_entry["cell line"]
