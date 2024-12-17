@@ -1,51 +1,110 @@
-# Cell Line Metadata Database
+# SDRF Cell Line Metadata Database
 
-This repository contains scripts for creating and managing a cell line metadata database to enable the annotation of SDRFs for cell lines datasets. The main use case is the annotation of SDRF datasets for the [quantms.org resource](quantms.org). This repo uses multiple ontologies and natural language processing (NLP) to annotate cell lines in SDRF files. 
+This repository provides tools to create and manage a **cell line metadata database** for annotating SDRFs (Sample and Data Relationship Format) in proteomics studies. The primary use case is enhancing annotation consistency for [quantms.org](https://quantms.org) datasets. The scripts integrate multiple ontologies and **natural language processing (NLP)** methods to standardize cell line metadata.
+
+---
+
+## Table of Contents
+
+1. [Motivation](#motivation)  
+2. [Metadata Sources](#metadata-sources)  
+3. [Ontologies](#ontologies)  
+4. [Database Structure](#database-structure)  
+5. [Features](#features)  
+6. [Requirements](#requirements)  
+7. [Installation](#installation)  
+8. [Usage](#usage)  
+9. [Contribution](#contribution)  
+10. [License](#license)
+
+---
 
 ## Motivation
 
-Cell lines are a fundamental part of biological research, and they are used in a wide range of experiments. However, cell line metadata can be inconsistent and difficult to manage. Here we are creating a database that can be used to annotate/validate proteomics SDRF for cell lines studies. These are the major sources of cell line metadata:
+Cell lines are essential in biological research but often lack standardized metadata, leading to inconsistencies. This repository aims to:
 
-- [Cellosaurus](https://web.expasy.org/cellosaurus/): Cellosaurus is the **main source** of metadata in our database. The source of the metadata can be downloaded from [cellosaurus.txt](https://ftp.expasy.org/databases/cellosaurus/cellosaurus.txt). We converted the file to a shorter version with only the fields that we are interested and the taxonomy. We use the script `[cellosaurus_db.py](cellosaurus_db.py)` to create the database.
-- [Cell model passports](https://cog.sanger.ac.uk/cmp/download/model_list_20240110.csv): The cell model passports are a collection of cell lines from multiple sources. We use the file [model_list_20240110.csv](model_list_20240110.csv) to create a database extracting only the cell lines information `[cellpassports_db.py](cellpassports_db.py)`.
-- [EA](https://https://www.ebi.ac.uk/gxa): Expression Atlas has been curating for more than 10 years the metadata of multiple RNA experiments. We collect multiple cell lines experiments from EA in folder [ea](ea); and try to create a catalog of cell lines metadata as an extra source. We use the following script `[ea_db.py](ea_db.py)` to create the database.
+- **Create a centralized database** for cell line metadata.
+- **Facilitate annotation and validation** of cell line SDRFs, particularly in proteomics datasets.
+
+---
+
+## Metadata Sources
+
+We integrate metadata from **three main sources** and additional curation efforts:
+
+1. **[Cellosaurus](https://web.expasy.org/cellosaurus/):**  
+   The primary metadata source.  
+   - Download: [cellosaurus.txt](https://ftp.expasy.org/databases/cellosaurus/cellosaurus.txt)  
+   - Script: [`cellosaurus_db.py`](cellosaurus_db.py) extracts relevant fields.  
+
+2. **[Cell Model Passports](https://cog.sanger.ac.uk/cmp):**  
+   A collection of cell lines from various sources.  
+   - Input file: [model_list_20240110.csv](model_list_20240110.csv)  
+   - Script: [`cellpassports_db.py`](cellpassports_db.py) processes this data.  
+
+3. **[Expression Atlas (EA)](https://www.ebi.ac.uk/gxa):**  
+   Metadata curated over RNA experiments for over 10 years.  
+   - Collected data: Stored in the `ea/` folder.  
+   - Script: [`ea_db.py`](ea_db.py) processes this source.  
+
+> **Additional Curation**: Manual annotation is performed using data from:  
+> - [Coriell Cell Line Catalog](https://www.coriell.org/)  
+> - [Cell Bank RIKEN](https://cell.brc.riken.jp/en/)  
+> - [ATCC](https://www.atcc.org/)
+
+---
 
 ## Ontologies
 
-- [MONDO](https://bioportal.bioontology.org/ontologies/MONDO): The Monarch Disease Ontology (MONDO) is used to annotate the disease of the cell line.
-- [BTO](https://bioportal.bioontology.org/ontologies/BTO): The BRENDA Tissue Ontology (BTO) is used to annotate an extra reference for the cell line ID. 
+The following ontologies are used for annotation:
 
-> **Note**: Additionally, we use other resources such as [Coriell cell line Catalog](https://www.coriell.org/), [cell bank riken](https://cell.brc.riken.jp/en/) and [atcc](https://www.atcc.org/) for manual annotation of cell lines in the database. 
+1. **[MONDO](https://bioportal.bioontology.org/ontologies/MONDO):**  
+   Used to annotate the disease associated with a cell line.
 
-## Features for every cell line
+2. **[BTO](https://bioportal.bioontology.org/ontologies/BTO):**  
+   Provides additional references for cell line IDs.
 
-The database is created using SQLite and contains the following fields:
+---
 
-- **cell line**: The cell line name as defined by the curation team (ai or manual).
-- **cellosaurus name**: The cell line name as annotated in Cellosaurus `ID` 
-- **cellosaurus accession**: The cell line accession as annotated in Cellsaurus `AC`
-- **bto cell line**: The cell line name as annotated in BTO
-- **organism**: The organism of the cell line as annotated in Cellosaurus
-- **organism part**: This information is not available in Cellosaurus, we use other sources to _annotate_ this field.
-- **sampling site**: The sampling site of the cell line as annotated in Cellosaurus. If the information is not available, we use other sources to _annotate_ this field.
-- **age**: The age of the cell line as annotated in Cellosaurus. If the age is not available (empty), we annotated the age from other sources such as [atcc](https://www.atcc.org/) or [Coriell cell line Catalog](https://www.coriell.org/)
-- **developmental stage**: The developmental stage of the cell line as annotated in Cellosaurus; if the information is not available is inferred from the age of the cell line. 
-- **sex**: Sex as provided by Cellosaurus
-- **ancestry category**: The ancestry category of the cell line as annotated in Cellosaurus. If not available we use other sources. 
-- **disease**: The disease is _"agreed"_ among sources.  
-- **cell type**: The cell type is _"agreed"_ among sources.
-- **Material type**: The material is _"agreed"_ among sources.
-- **synonyms**: This field is built using all the accessions and synonyms from all sources.
-- **curated**: This field is used to annotate if the cell line has been curated by the team, the classes are _not curated_, _ai curated_, _manual curated_.
+## Database Structure
 
-> **Note**: The database is a tab-delimited file that can be easily read and search using pandas or GitHub table rendering. 
+The database is implemented using **SQLite** and contains the following key fields:
+
+| Field Name              | Description                                                                 |
+|-------------------------|-----------------------------------------------------------------------------|
+| **cell line**           | Cell line name (curated: AI or manual).                                     |
+| **cellosaurus name**    | Name as annotated in Cellosaurus `ID`.                                      |
+| **cellosaurus accession** | Accession ID from Cellosaurus `AC`.                                       |
+| **bto cell line**       | Name as annotated in BTO.                                                   |
+| **organism**            | Organism species (from Cellosaurus).                                        |
+| **organism part**       | Annotated from supplementary sources.                                       |
+| **sampling site**       | Sampling site of the cell line.                                             |
+| **age**                 | Age of the cell line (from Cellosaurus or additional sources).              |
+| **developmental stage** | Developmental stage (inferred from age if missing).                        |
+| **sex**                 | Sex information (from Cellosaurus).                                         |
+| **ancestry category**   | Ancestry classification (from Cellosaurus or supplementary sources).        |
+| **disease**             | Agreed-upon disease annotation across sources.                             |
+| **cell type**           | Agreed-upon cell type annotation across sources.                           |
+| **material type**       | Agreed-upon material classification.                                       |
+| **synonyms**            | Consolidated synonyms and accessions from all sources.                     |
+| **curated**             | Curation status: `_not curated_`, `_AI curated_`, or `_manual curated_`.    |
+
+> **Note**: The final database is provided as a **tab-delimited file** for easy integration. It can be loaded into tools like **Pandas** or viewed directly via GitHub's table renderer.
+
+---
+
+## Features
+
+- Standardizes metadata from **multiple sources**.
+- Uses **ontologies** to annotate diseases and tissue information.
+- Supports **AI-based curation** and manual validation for accuracy.
+- Provides **easy-to-query** tab-delimited outputs.
+
+---
 
 ## Requirements
 
-- Python 3.x
-- Libraries: `pandas`, `spacy`, `click`, `owlready2`, `scikit-learn`
-- Spacy model: `en_core_web_md`
+To use the scripts, ensure the following are installed:
 
-## Installation
-
-Install the required Python packages using pip:
+- **Python 3.x**
+- Required libraries:  
