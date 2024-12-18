@@ -39,7 +39,7 @@ We integrate metadata from **three main sources** and additional curation effort
 
 2. **[Cell Model Passports](https://cog.sanger.ac.uk/cmp):**  
    A collection of cell lines from various sources.  
-   - Input file: [model_list_20240110.csv](model_list_20240110.csv)  
+   - Input file: [model_list_20240110.csv](cellpassports/model_list_20240110.csv)  
    - Script: [`cellpassports_db.py`](cellpassports_db.py) processes this data.  
 
 3. **[Expression Atlas (EA)](https://www.ebi.ac.uk/gxa):**  
